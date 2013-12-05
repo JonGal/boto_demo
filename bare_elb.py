@@ -166,8 +166,7 @@ conn_as.create_auto_scaling_group(ag)
 scalingUpPolicy = ScalingPolicy(name='webserverScaleUpPolicy',
                                   adjustment_type='ChangeInCapacity',
                                   as_name=ag.name,
-                                  scaling_adjustment=2,
-                                  cooldown=180)
+                                  scaling_adjustment=2)
 
 scalingDownPolicy = ScalingPolicy(name='webserverScaleDownPolicy',
                                   adjustment_type='ChangeInCapacity',
