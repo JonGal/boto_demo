@@ -1,10 +1,32 @@
+#Boto demo adpated from  source found on github
+# Creates an Elastic Load Balancer, Launch Confguration, 
+# Scaling Group, and Scaling Policies using the boto library for python
+#
+# In order to run this you should either run on an EC2 instance with appropriate IAM Role
+# or create a file for system users or individiuals to access the proper access credentials
+# Use /etc/boto.cfg - for site-wide settings that all users on this machine will use
+# Use ~/.boto - for user-specific settings
+#
+# Inside this file, make sure you have stored the proper credntials, in this format:
+#
+#[Credentials]
+#aws_access_key_id = <your access key>
+#aws_secret_access_key = <your secret key>
+#
+#See this post for information on how to get your credentials:
+# http://blogs.aws.amazon.com/security/post/Tx1R9KDN9ISZ0HF/Where-s-my-secret-access-key
+
 import sys, getopt
 import boto.ec2
  
 from boto.ec2.elb import ELBConnection
 from boto.ec2.elb import HealthCheck
  
- 
+from boto.ec2.autoscale import AutoScaleConnection
+from boto.ec2.autoscale import LaunchConfiguration
+from boto.ec2.autoscale import AutoScalingGroup
+from boto.ec2.autoscale import ScalingPolicy
+
 ##############################CONFIGURATION#######################################
 
  
@@ -122,3 +144,36 @@ lb.register_instances(instance_ids)
 # 
 ##DNS name for your new load balancer
 print "Map the CNAME of your website to: %s" % (lb.dns_name)
+#=================Create a Auto Scaling Group and a Launch Configuration=============================================
+#For a complete list of options see http://boto.cloudhackers.com/ref/ec2.html#boto.ec2.autoscale.launchconfig.LaunchConfiguration
+lc = LaunchConfiguration(name=lc_name, image_id=as_ami['id'],
+                             key_name=as_ami['access_key'],
+                             security_groups=as_ami['security_groups'],
+                             instance_type=as_ami['instance_type'],
+                             instance_monitoring=as_ami['instance_monitoring'])
+conn_as.create_launch_configuration(lc)
+
+#For a complete list of options see http://boto.cloudhackers.com/ref/ec2.html#boto.ec2.autoscale.group.AutoScalingGroup
+ag = AutoScalingGroup(group_name=autoscaling_group['name'], load_balancers=[elastic_load_balancer['name']],
+                          availability_zones=zoneStrings,
+                          launch_config=lc, min_size=autoscaling_group['min_size'], max_size=autoscaling_group['max_size'])
+conn_as.create_auto_scaling_group(ag)
+
+
+#=================Create Scaling Policies=============================================
+#Policy for scaling the number of servers up and down
+#For a complete list of options see http://boto.cloudhackers.com/ref/ec2.html#boto.ec2.autoscale.policy.ScalingPolicy
+scalingUpPolicy = ScalingPolicy(name='webserverScaleUpPolicy',
+                                  adjustment_type='ChangeInCapacity',
+                                  as_name=ag.name,
+                                  scaling_adjustment=2,
+                                  cooldown=180)
+
+scalingDownPolicy = ScalingPolicy(name='webserverScaleDownPolicy',
+                                  adjustment_type='ChangeInCapacity',
+                                  as_name=ag.name,
+                                  scaling_adjustment=-1,
+                                  cooldown=180)
+
+conn_as.create_scaling_policy(scalingUpPolicy)
+conn_as.create_scaling_policy(scalingDownPolicy)
