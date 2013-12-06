@@ -98,33 +98,11 @@ for zone in zones:
 
 print zoneStrings;
 
-#==== Connect to the EC2 services =============
-conn_reg = boto.ec2.connection.EC2Connection(region=connect_region)
+conn_elb = ELBConnection()
+conn_as = AutoScaleConnection()
 
+all_elb = conn_elb.get_all_load_balancers()
 
-#=========Start Instances =============
-instance_ids = []
-for name in zoneStrings:
-	if name == 'us-east-1a':
-		continue
-
-	reg = conn_reg.run_instances (as_ami['id'],
-		key_name=as_ami['access_key'],
-		placement=name,
-		instance_type=as_ami['instance_type'],
-		security_groups=as_ami['security_groups'],
-		monitoring_enabled=as_ami['instance_monitoring'],
-		instance_profile_arn=as_ami['instance_profile_arn']
-		)
-	instance_ids.append(reg.instances[0].id)
-
-print instance_ids;
-
-#==== Connect to the ELB services =============
-#Set up the correct region and regional endpoint
-elb_connect_region = boto.ec2.regioninfo.RegionInfo(name=region,
-    endpoint="elasticloadbalancing."+region+".amazonaws.com")
-conn_elb = ELBConnection(region=elb_connect_region)
 
 
 ##=================Create a Load Balancer=============================================
@@ -140,7 +118,8 @@ lb = conn_elb.create_load_balancer(elastic_load_balancer['name'],
                                        elastic_load_balancer['connection_forwarding'])
  
 lb.configure_health_check(hc)
-lb.register_instances(instance_ids)
+lb.enable_zones(zoneStrings)
+
 # 
 ##DNS name for your new load balancer
 print "Map the CNAME of your website to: %s" % (lb.dns_name)
